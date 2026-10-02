@@ -1,0 +1,10 @@
+[general]
+name=Procesar CAHSA
+qgisMinimumVersion=4.0
+description=Procesamiento NDVI y RGB Sentinel-2 CAHSA.
+version=1.0.0
+author=Gaspar Tabora Funez 
+category=Processing
+icon=icon.png
+experimental=False
+deprecated=False
