@@ -40,7 +40,7 @@ class ProcesarCAHSAAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.MASK,
-                "Máscara CAHSA",
+                "Máscara",
                 [QgsProcessing.TypeVectorPolygon]
             )
         )
@@ -144,7 +144,7 @@ class ProcesarCAHSAAlgorithm(QgsProcessingAlgorithm):
 
         if mask is None:
             raise QgsProcessingException(
-                "No se pudo cargar la máscara CAHSA."
+                "No se pudo cargar la máscara."
             )
 
         mask_source = self.parameterAsString(
@@ -331,7 +331,7 @@ class ProcesarCAHSAAlgorithm(QgsProcessingAlgorithm):
             # ═════════════════════════════════════════
 
             feedback.pushInfo(
-                "Recortando bandas por máscara CAHSA..."
+                "Recortando bandas por máscara..."
             )
 
             clipped = {}
@@ -617,11 +617,11 @@ class ProcesarCAHSAAlgorithm(QgsProcessingAlgorithm):
 
     def displayName(self):
 
-        return "Procesar Sentinel-2 · CAHSA"
+        return "Procesar Sentinel-2"
 
     def group(self):
 
-        return "Sentinel-2 · CAHSA"
+        return "Sentinel-2"
 
     def groupId(self):
 
@@ -631,7 +631,7 @@ class ProcesarCAHSAAlgorithm(QgsProcessingAlgorithm):
 
         return (
             "Procesa las bandas Sentinel-2 B02, B03, B04 y B08 "
-            "utilizando la máscara CAHSA. "
+            "utilizando la máscara. "
             "Corrige el offset de 1000, recorta las bandas, "
             "genera un RGB GeoTIFF y calcula NDVI. "
             "Opcionalmente aplica un estilo QML al NDVI."

@@ -152,10 +152,10 @@ class PintarMapasAlgorithm(QgsProcessingAlgorithm):
         return "pintar_mapas"
 
     def displayName(self):
-        return "Pintar Mapas CAHSA"
+        return "Pintar Mapas"
 
     def group(self):
-        return "Sentinel-2 · CAHSA"
+        return "Sentinel-2"
 
     def groupId(self):
         return "sentinel2_cahsa"

@@ -11,15 +11,15 @@ from .provider import ProcesarCAHSAProvider
 class SelectionDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Opciones CAHSA")
+        self.setWindowTitle("Opciones")
         self.setFixedSize(300, 150)
         
         layout = QVBoxLayout()
         label = QLabel("Seleccione la herramienta a ejecutar:")
         layout.addWidget(label)
         
-        self.btn_procesar = QPushButton("Procesar Sentinel-2 · CAHSA")
-        self.btn_pintar = QPushButton("Pintar Mapas CAHSA")
+        self.btn_procesar = QPushButton("Procesar Sentinel-2")
+        self.btn_pintar = QPushButton("Pintar Mapas")
         
         layout.addWidget(self.btn_procesar)
         layout.addWidget(self.btn_pintar)
@@ -51,12 +51,12 @@ class ProcesarCAHSAPlugin:
 
         self.action = QAction(
             QIcon(str(icon_path)),
-            "Procesar Sentinel-2 · CAHSA",
+            "Procesar Sentinel-2",
             self.iface.mainWindow()
         )
 
         self.action.setToolTip(
-            "Procesar Sentinel-2 · CAHSA"
+            "Procesar Sentinel-2"
         )
 
         self.action.triggered.connect(
@@ -70,7 +70,7 @@ class ProcesarCAHSAPlugin:
 
         # Agregar al menú Complementos
         self.iface.addPluginToMenu(
-            "Procesar CAHSA",
+            "CAHSA",
             self.action
         )
 
@@ -115,7 +115,7 @@ class ProcesarCAHSAPlugin:
             )
 
             self.iface.removePluginMenu(
-                "Procesar CAHSA",
+                "CAHSA",
                 self.action
             )
 

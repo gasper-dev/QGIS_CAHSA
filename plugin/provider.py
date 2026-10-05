@@ -13,7 +13,7 @@ class ProcesarCAHSAProvider(QgsProcessingProvider):
         return "procesar_cahsa"
 
     def name(self):
-        return "Procesar CAHSA"
+        return "Procesar Sentinel-2"
 
     def longName(self):
-        return "Procesamiento Sentinel-2 · CAHSA"
+        return "Procesar Sentinel-2"
