@@ -85,14 +85,15 @@ class PintarMapasAlgorithm(QgsProcessingAlgorithm):
             raise QgsProcessingException("No se pudo cargar las capas.")
 
         try:
+            request = QgsFeatureRequest().setFlags(QgsFeatureRequest.NoGeometry)
             input_values = set()
-            for feat in source_layer.getFeatures():
+            for feat in source_layer.getFeatures(request):
                 val = feat[field_input]
                 if val is not None:
                     input_values.add(str(val))
 
             excel_values = set()
-            for feat in excel_layer.getFeatures():
+            for feat in excel_layer.getFeatures(request):
                 val = feat[field_excel]
                 if val is not None:
                     excel_values.add(str(val))
