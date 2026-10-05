@@ -3,10 +3,27 @@ from pathlib import Path
 import processing
 
 from qgis.core import QgsApplication
-from qgis.PyQt.QtWidgets import QAction
+from qgis.PyQt.QtWidgets import QAction, QDialog, QVBoxLayout, QPushButton, QLabel
 from qgis.PyQt.QtGui import QIcon
 
 from .provider import ProcesarCAHSAProvider
+
+class SelectionDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Opciones CAHSA")
+        self.setFixedSize(300, 150)
+        
+        layout = QVBoxLayout()
+        label = QLabel("Seleccione la herramienta a ejecutar:")
+        layout.addWidget(label)
+        
+        self.btn_procesar = QPushButton("Procesar Sentinel-2 · CAHSA")
+        self.btn_pintar = QPushButton("Pintar Mapas CAHSA")
+        
+        layout.addWidget(self.btn_procesar)
+        layout.addWidget(self.btn_pintar)
+        self.setLayout(layout)
 
 
 class ProcesarCAHSAPlugin:
@@ -59,39 +76,34 @@ class ProcesarCAHSAPlugin:
 
     def run(self):
 
-        algorithm_id = (
-            "procesar_cahsa:procesar_cahsa"
+        dialog = SelectionDialog(self.iface.mainWindow())
+
+        def run_algo(alg_id):
+            dialog.accept()
+            algorithm = QgsApplication.processingRegistry().algorithmById(alg_id)
+            if algorithm is None:
+                self.iface.messageBar().pushCritical(
+                    "CAHSA",
+                    f"No se encontró el algoritmo: {alg_id}"
+                )
+                return
+
+            try:
+                processing.execAlgorithmDialog(alg_id)
+            except Exception as e:
+                self.iface.messageBar().pushCritical(
+                    "CAHSA",
+                    f"No se pudo abrir el algoritmo: {e}"
+                )
+
+        dialog.btn_procesar.clicked.connect(
+            lambda: run_algo("procesar_cahsa:procesar_cahsa")
+        )
+        dialog.btn_pintar.clicked.connect(
+            lambda: run_algo("procesar_cahsa:pintar_mapas")
         )
 
-        algorithm = (
-            QgsApplication
-            .processingRegistry()
-            .algorithmById(
-                algorithm_id
-            )
-        )
-
-        if algorithm is None:
-
-            self.iface.messageBar().pushCritical(
-                "Procesar CAHSA",
-                "No se encontró el algoritmo."
-            )
-
-            return
-
-        try:
-
-            processing.execAlgorithmDialog(
-                algorithm_id
-            )
-
-        except Exception as e:
-
-            self.iface.messageBar().pushCritical(
-                "Procesar CAHSA",
-                f"No se pudo abrir el algoritmo: {e}"
-            )
+        dialog.exec()
 
     def unload(self):
 

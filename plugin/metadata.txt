@@ -1,9 +1,10 @@
 [general]
-name=Procesar CAHSA
+name=CAHSA Plugin
 qgisMinimumVersion=4.0
-description=Procesamiento NDVI y RGB Sentinel-2 CAHSA.
-version=1.0.0
+description=plugin de QGIS para procesos relacionados con CAHSA.
+version=1.0.2
 author=Gaspar Tabora Funez 
+credit= Bella,Olman,Abad
 category=Processing
 icon=icon.png
 experimental=False
