@@ -84,6 +84,40 @@ class PintarMapasAlgorithm(QgsProcessingAlgorithm):
         if source_layer is None or excel_layer is None:
             raise QgsProcessingException("No se pudo cargar las capas.")
 
+        try:
+            input_values = set()
+            for feat in source_layer.getFeatures():
+                val = feat[field_input]
+                if val is not None:
+                    input_values.add(str(val))
+
+            excel_values = set()
+            for feat in excel_layer.getFeatures():
+                val = feat[field_excel]
+                if val is not None:
+                    excel_values.add(str(val))
+                    
+            lotes_encontrados = excel_values.intersection(input_values)
+            lotes_no_encontrados = excel_values - input_values
+            
+            feedback.pushInfo(f"==================================================")
+            feedback.pushInfo(f"REPORTE DE BÚSQUEDA DE LOTES")
+            feedback.pushInfo(f"==================================================")
+            feedback.pushInfo(f"Total de lotes del Excel encontrados en la máscara: {len(lotes_encontrados)}")
+            
+            if lotes_no_encontrados:
+                feedback.pushInfo(f"ATENCIÓN: {len(lotes_no_encontrados)} lote(s) del Excel NO se encontraron en la máscara.")
+                feedback.pushInfo(f"Esto puede deberse a errores de escritura o espacios extra.")
+                for lote in sorted(list(lotes_no_encontrados))[:50]:
+                    feedback.pushInfo(f" -> LOTE NO ENCONTRADO: '{lote}'")
+                if len(lotes_no_encontrados) > 50:
+                    feedback.pushInfo(f" ... y {len(lotes_no_encontrados) - 50} más.")
+            else:
+                feedback.pushInfo("¡Excelente! Todos los lotes del Excel existen en la máscara.")
+            feedback.pushInfo(f"==================================================")
+        except Exception as e:
+            feedback.pushInfo(f"Advertencia: No se pudo realizar el reporte previo: {str(e)}")
+
         feedback.pushInfo("Ejecutando unión de atributos...")
 
         join_result = processing.run(
