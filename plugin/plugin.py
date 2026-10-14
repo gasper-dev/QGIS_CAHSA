@@ -12,7 +12,7 @@ class SelectionDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Opciones")
-        self.setFixedSize(300, 150)
+        self.setFixedSize(300, 190)
         
         layout = QVBoxLayout()
         label = QLabel("Seleccione la herramienta a ejecutar:")
@@ -20,9 +20,11 @@ class SelectionDialog(QDialog):
         
         self.btn_procesar = QPushButton("Procesar Sentinel-2")
         self.btn_pintar = QPushButton("Pintar Mapas")
+        self.btn_reclasificar = QPushButton("Reclasificar NDVI")
         
         layout.addWidget(self.btn_procesar)
         layout.addWidget(self.btn_pintar)
+        layout.addWidget(self.btn_reclasificar)
         self.setLayout(layout)
 
 
@@ -101,6 +103,9 @@ class ProcesarCAHSAPlugin:
         )
         dialog.btn_pintar.clicked.connect(
             lambda: run_algo("procesar_cahsa:pintar_mapas")
+        )
+        dialog.btn_reclasificar.clicked.connect(
+            lambda: run_algo("procesar_cahsa:reclasificar_ndvi")
         )
 
         dialog.exec()
