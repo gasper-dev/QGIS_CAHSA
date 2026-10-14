@@ -1,13 +1,11 @@
 import os
 import csv
 import processing
-import numpy as np
 
 from osgeo import gdal
 
 from qgis.PyQt.QtGui import QColor
 from qgis.core import (
-    QgsProcessing,
     QgsProcessingAlgorithm,
     QgsProcessingParameterRasterLayer,
     QgsProcessingParameterBand,
@@ -52,11 +50,11 @@ class NDVIPostProcessor(QgsProcessingLayerPostProcessorInterface):
         color_shader.setColorRampItemList(items)
         shader.setRasterShaderFunction(color_shader)
 
-        layer.setRenderer(
-            QgsSingleBandPseudoColorRenderer(
-                layer.dataProvider(), 1, shader
-            )
+        renderer = QgsSingleBandPseudoColorRenderer(
+            layer.dataProvider(), 1, shader
         )
+
+        layer.setRenderer(renderer)
         layer.triggerRepaint()
 
 
@@ -114,9 +112,9 @@ class ReclasificarNDVIAlgorithm(QgsProcessingAlgorithm):
 
     def shortHelpString(self):
         return (
-            "Reclasifica NDVI, aplica simbología y genera "
-            "estadísticas por clase en CSV y tabla de "
-            "atributos raster cuando el formato lo permite."
+            "Reclasifica un NDVI en 14 clases, aplica simbología "
+            "y genera estadísticas por clase en CSV y una RAT "
+            "cuando el formato de salida lo permite."
         )
 
     def initAlgorithm(self, config=None):
@@ -130,7 +128,7 @@ class ReclasificarNDVIAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterBand(
                 self.BAND,
-                "Banda",
+                "Banda del ráster",
                 defaultValue=1,
                 parentLayerParameterName=self.INPUT
             )
@@ -159,12 +157,13 @@ class ReclasificarNDVIAlgorithm(QgsProcessingAlgorithm):
                 "El ráster de entrada no es válido."
             )
 
+        # 1. Reclasificar el NDVI.
         feedback.pushInfo("1/4 Reclasificando NDVI...")
 
         table = [
-            item
-            for minimum, maximum, value in self.CLASSES
-            for item in (minimum, maximum, value)
+            value
+            for minimum, maximum, category in self.CLASSES
+            for value in (minimum, maximum, category)
         ]
 
         result = processing.run(
@@ -185,9 +184,11 @@ class ReclasificarNDVIAlgorithm(QgsProcessingAlgorithm):
 
         output_path = result["OUTPUT"]
 
+        # 2. Leer el ráster y calcular estadísticas.
         feedback.pushInfo("2/4 Calculando estadísticas...")
 
         dataset = gdal.Open(output_path, gdal.GA_Update)
+
         if dataset is None:
             raise QgsProcessingException(
                 "No se pudo abrir el ráster de salida."
@@ -197,45 +198,67 @@ class ReclasificarNDVIAlgorithm(QgsProcessingAlgorithm):
         array = raster_band.ReadAsArray()
         nodata = raster_band.GetNoDataValue()
 
-        valid = np.isfinite(array)
+        valid = array >= 1
+        valid &= array <= 14
+
         if nodata is not None:
             valid &= array != nodata
 
-        valid_values = array[valid]
-        total_pixels = int(valid_values.size)
+        values = array[valid]
+        total_pixels = int(values.size)
 
         if total_pixels == 0:
             dataset = None
             raise QgsProcessingException(
-                "El ráster no contiene píxeles clasificados."
+                "No hay píxeles clasificados entre 1 y 14."
             )
 
-        unique, counts = np.unique(
-            valid_values, return_counts=True
+        unique, counts = __import__("numpy").unique(
+            values, return_counts=True
         )
+
         counts_by_class = {
             int(value): int(count)
             for value, count in zip(unique, counts)
         }
 
-        geotransform = dataset.GetGeoTransform()
+        # Área del píxel usando el determinante de la transformación.
+        transform = dataset.GetGeoTransform()
+
         pixel_area = abs(
-            geotransform[1] * geotransform[5]
-            - geotransform[2] * geotransform[4]
+            transform[1] * transform[5]
+            - transform[2] * transform[4]
         )
 
+        # Compatible con QGIS 4: comprobar unidades, no isProjected().
         crs = raster.crs()
         area_factor = None
 
-        if crs.isValid() and crs.isProjected():
-            factor = QgsUnitTypes.fromUnitToUnitFactor(
-                crs.mapUnits(),
-                QgsUnitTypes.DistanceMeters
-            )
-            area_factor = pixel_area * factor**2 / 10000
+        if crs.isValid():
+            units = crs.mapUnits()
 
-        # CSV junto al ráster.
-        csv_path = os.path.splitext(output_path)[0] + "_tabla.csv"
+            supported_units = (
+                QgsUnitTypes.DistanceMeters,
+                QgsUnitTypes.DistanceFeet,
+                QgsUnitTypes.DistanceYards,
+                QgsUnitTypes.DistanceMiles,
+            )
+
+            if units in supported_units:
+                factor = QgsUnitTypes.fromUnitToUnitFactor(
+                    units,
+                    QgsUnitTypes.DistanceMeters
+                )
+
+                area_factor = pixel_area * factor**2 / 10000
+
+        # 3. Crear tabla CSV.
+        feedback.pushInfo("3/4 Generando tabla CSV...")
+
+        csv_path = (
+            os.path.splitext(output_path)[0]
+            + "_tabla.csv"
+        )
 
         headers = [
             "Clase",
@@ -246,36 +269,44 @@ class ReclasificarNDVIAlgorithm(QgsProcessingAlgorithm):
             "Porcentaje",
         ]
 
-        feedback.pushInfo("3/4 Generando tabla de clases...")
-
         with open(
-            csv_path, "w", newline="", encoding="utf-8-sig"
+            csv_path,
+            "w",
+            newline="",
+            encoding="utf-8-sig"
         ) as file:
-            writer = csv.DictWriter(file, fieldnames=headers)
+            writer = csv.DictWriter(
+                file,
+                fieldnames=headers
+            )
             writer.writeheader()
 
-            for minimum, maximum, value in self.CLASSES:
-                count = counts_by_class.get(value, 0)
+            for minimum, maximum, category in self.CLASSES:
+                count = counts_by_class.get(category, 0)
+
+                area_ha = (
+                    round(count * area_factor, 6)
+                    if area_factor is not None
+                    else ""
+                )
 
                 writer.writerow({
-                    "Clase": value,
+                    "Clase": category,
                     "NDVI_minimo": minimum,
                     "NDVI_maximo": maximum,
                     "Pixeles": count,
-                    "Area_ha": (
-                        round(count * area_factor, 6)
-                        if area_factor is not None else ""
-                    ),
+                    "Area_ha": area_ha,
                     "Porcentaje": round(
                         count * 100 / total_pixels, 4
                     ),
                 })
 
-        # Tabla de atributos raster (RAT) en GeoTIFF.
-        feedback.pushInfo("4/4 Guardando tabla raster...")
+        # 4. Guardar tabla de atributos raster (RAT).
+        feedback.pushInfo("4/4 Guardando tabla RAT...")
 
         try:
             rat = gdal.RasterAttributeTable()
+
             rat.CreateColumn(
                 "Clase", gdal.GFT_Integer, gdal.GFU_MinMax
             )
@@ -306,13 +337,13 @@ class ReclasificarNDVIAlgorithm(QgsProcessingAlgorithm):
 
             rat.SetRowCount(len(self.CLASSES))
 
-            for row, (minimum, maximum, value) in enumerate(
+            for row, (minimum, maximum, category) in enumerate(
                 self.CLASSES
             ):
-                count = counts_by_class.get(value, 0)
+                count = counts_by_class.get(category, 0)
                 color = QColor(self.COLORS[row])
 
-                rat.SetValueAsInt(row, 0, value)
+                rat.SetValueAsInt(row, 0, category)
                 rat.SetValueAsDouble(row, 1, minimum)
                 rat.SetValueAsDouble(row, 2, maximum)
                 rat.SetValueAsInt(row, 3, count)
@@ -325,6 +356,7 @@ class ReclasificarNDVIAlgorithm(QgsProcessingAlgorithm):
                 rat.SetValueAsDouble(
                     row, 5, count * 100 / total_pixels
                 )
+
                 rat.SetValueAsInt(row, 6, color.red())
                 rat.SetValueAsInt(row, 7, color.green())
                 rat.SetValueAsInt(row, 8, color.blue())
@@ -334,29 +366,32 @@ class ReclasificarNDVIAlgorithm(QgsProcessingAlgorithm):
 
         except Exception as error:
             feedback.pushWarning(
-                "No se pudo guardar la RAT en el GeoTIFF: "
-                f"{error}. La tabla CSV sí fue generada."
+                "No se pudo guardar la RAT dentro del GeoTIFF: "
+                f"{error}. La tabla CSV sí se generó."
             )
 
         dataset = None
 
-        # Aplicar simbología al ráster que Processing cargue.
+        # Aplicar simbología a la capa que cargue Processing.
         if context.willLoadLayerOnCompletion(self.OUTPUT):
             details = context.layerToLoadOnCompletionDetails(
                 self.OUTPUT
             )
             details.name = "Reclass_NDVI"
             details.setPostProcessor(
-                NDVIPostProcessor(self.CLASSES, self.COLORS)
+                NDVIPostProcessor(
+                    self.CLASSES,
+                    self.COLORS
+                )
             )
 
-        feedback.pushInfo(f"Ráster: {output_path}")
-        feedback.pushInfo(f"Tabla CSV: {csv_path}")
-        feedback.pushInfo(
-            "Área calculada en hectáreas: "
-            + ("Sí" if area_factor is not None else
-               "No; el CRS no es proyectado")
-        )
+        feedback.pushInfo(f"Ráster generado: {output_path}")
+        feedback.pushInfo(f"Tabla generada: {csv_path}")
+
+        if area_factor is None:
+            feedback.pushWarning(
+                "No se calcularon hectáreas: unidades CRS no compatibles."
+            )
 
         return {self.OUTPUT: output_path}
 
