@@ -1,8 +1,8 @@
 [general]
 name=CAHSA Plugin
-qgisMinimumVersion=4.3.0-Master
+qgisMinimumVersion=3.38.0
 description=Plugin de QGIS para procesos relacionados con CAHSA.(Creditos: Bella, Olman, Abad)
-version=1.0.3
+version=1.0.4
 author=Gaspar Tabora Funez 
 category=Processing
 icon=icon.png
